@@ -1,3 +1,6 @@
-wspr
-gpioclk
+gpioclk.o
 mailbox.o
+constants.o
+encode.o
+pack.o
+text.o
