@@ -15,11 +15,14 @@ endif
 
 all: ft8 gpioclk
 
+stoargc.o: stoargc.c
+	$(CC) $(CFLAGS) -c stoargc.c
+
 mailbox.o: mailbox.c mailbox.h
 	$(CC) $(CFLAGS) -c mailbox.c
 
-ft8: mailbox.o ft8.cpp mailbox.h encode.o pack.o text.o constants.o
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) $(PI_VERSION) mailbox.o encode.o pack.o text.o constants.o ft8.cpp -oft8
+ft8: mailbox.o ft8.cpp mailbox.h encode.o pack.o text.o constants.o stoargc.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) $(PI_VERSION) mailbox.o encode.o pack.o text.o constants.o stoargc.o ft8.cpp -oft8
 
 gpioclk: gpioclk.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) $(PI_VERSION) gpioclk.cpp -ogpioclk
