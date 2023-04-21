@@ -264,212 +264,173 @@ static struct
 } mbox;
 
 /* Function prototypes */
-int receiveMessage(FT8Msg_t *msg);
-int transmitFT8(FT8Msg_t *msg);
 void handleBrokenPipe(int signo);
 int handleSendTx(int skt);
 int mainFT8(const int argc, char *const argv[]);
-
 
 /* Variables */
 int new_socket = 0;
 
 int handleSendTx(int skt)
 {
-    time_t t = time(NULL);
-    int sec;
-    struct tm tm = *localtime(&t);
-    FT8Msg Txletter;
+  time_t t = time(NULL);
+  int sec;
+  struct tm tm = *localtime(&t);
+  FT8Msg Txletter;
 
-    Txletter.type = CHANGE_RTX_STATE;
-    Txletter.RTXstate = true;
-    sprintf(Txletter.ft8Message, "Transmitting...\n");
-    sec = (tm.tm_sec % 15);
-    sleep(15 - sec);
+  Txletter.type = CHANGE_RTX_STATE;
+  Txletter.RTXstate = true;
+  sprintf(Txletter.ft8Message, "Transmitting...\n");
+  sec = (tm.tm_sec % 15);
+  sleep(15 - sec);
 
-    t = time(NULL);
-    tm = *localtime(&t);
-    printf("now: %d-%02d-%02d %02d:%02d:%02d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-    send(skt, &Txletter, sizeof(Txletter), 0);
+  t = time(NULL);
+  tm = *localtime(&t);
+  printf("now: %d-%02d-%02d %02d:%02d:%02d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+  send(skt, &Txletter, sizeof(Txletter), 0);
 
-    sleep(10);
+  sleep(10);
 
-    Txletter.RTXstate = false;
-    sprintf(Txletter.ft8Message, "End of transmission\n");
-    send(skt, &Txletter, sizeof(Txletter), 0);
+  Txletter.RTXstate = false;
+  sprintf(Txletter.ft8Message, "End of transmission\n");
+  send(skt, &Txletter, sizeof(Txletter), 0);
 
-    return 0;
+  return 0;
 }
-
-
 
 int main(const int argc, char *const argv[])
 {
-    int server_fd, valread;
-    struct sockaddr address = {AF_UNIX, SOCKNAME};
-    struct sigaction act;
-    socklen_t addrlen = sizeof(address);
-    FT8Msg Txletter, Rxletter;
-    int socket_status;
-    int argnumber;
-    char **argvalue;
+  int server_fd, valread;
+  struct sockaddr address = {AF_UNIX, SOCKNAME};
+  struct sigaction act;
+  socklen_t addrlen = sizeof(address);
+  FT8Msg Txletter, Rxletter;
+  int socket_status;
+  int argnumber;
+  char **argvalue;
 
-    fd_set readfds; /* Flag for select()     */
+  fd_set readfds; /* Flag for select()     */
 
-    printf("%s\n\n", PROGRAM);
+  printf("%s\n\n", PROGRAM);
 
-    /* Set an handler for SIGPIPE */
-    act.sa_handler = handleBrokenPipe;
-    sigemptyset(&act.sa_mask);
-    sigaddset(&act.sa_mask, SIGPIPE);
-    act.sa_flags = 0;
-    sigaction(SIGPIPE, &act, (struct sigaction *)NULL);
+  /* Set an handler for SIGPIPE */
+  act.sa_handler = handleBrokenPipe;
+  sigemptyset(&act.sa_mask);
+  sigaddset(&act.sa_mask, SIGPIPE);
+  act.sa_flags = 0;
+  sigaction(SIGPIPE, &act, (struct sigaction *)NULL);
 
+  if (argc > 1)
+  {
+    mainFT8(argc, argv);
+    exit(EXIT_SUCCESS);
+  }
 
-    if (argc > 1)
+  printf("Executing in daemon mode\n");
+
+  // Creating socket file descriptor
+  if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
+  {
+    perror("socket failed");
+    exit(EXIT_FAILURE);
+  }
+
+  unlink(SOCKNAME);
+
+  // Forcefully attaching socket to the port 8080
+  if (bind(server_fd, (struct sockaddr *)&address,
+           sizeof(address)) < 0)
+  {
+    perror("bind failed");
+    exit(EXIT_FAILURE);
+  }
+  if (listen(server_fd, 3) < 0)
+  {
+    perror("listen");
+    exit(EXIT_FAILURE);
+  }
+
+  while (true)
+  {
+    /* Clear fd mask */
+    FD_ZERO(&readfds);
+
+    /* Initiate all existing bits */
+    FD_SET(server_fd, &readfds);
+
+    socket_status = select(server_fd + 1, &readfds, (fd_set *)NULL,
+                           (fd_set *)NULL, NULL); // Timeout is null now &timeout);
+    /* Check the return value: less than zero means error
+       zero means timeout
+    */
+
+    switch (socket_status) // Timeout in select, repeat the loop
+    {
+    case -1:
+      printf("Error in Server Socket Status\n");
+      return 0;
+    case 0:
+      // printf("Timeout in Server select\n");
+      break;
+
+    default:
+      // printf("select Server returned a good value\n");
+      break;
+    }
+
+    if (FD_ISSET(server_fd, &readfds))
+    {
+      // printf("FD_ISSET says that it's a new Client socket\n");
+
+      if ((new_socket = accept(server_fd, (struct sockaddr *)&address,
+                               (socklen_t *)&addrlen)) < 0)
       {
-        mainFT8(argc,argv);
-        exit(EXIT_SUCCESS);
+        perror("accept");
+        exit(EXIT_FAILURE);
       }
-
-
-    printf("Executing in daemon mode\n");
-
-    // Creating socket file descriptor
-    if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
-    {
-        perror("socket failed");
-        exit(EXIT_FAILURE);
     }
 
-    unlink(SOCKNAME);
+    valread = read(new_socket, &Rxletter, sizeof(Rxletter));
 
-    // Forcefully attaching socket to the port 8080
-    if (bind(server_fd, (struct sockaddr *)&address,
-             sizeof(address)) < 0)
+    if (!valread)
+      continue;
+
+    printf("%s\n", Rxletter.ft8Message);
+    switch (Rxletter.type)
     {
-        perror("bind failed");
-        exit(EXIT_FAILURE);
+    case SEND_F8_REQ:
+      string_to_argv(Rxletter.ft8Message, &argnumber, &argvalue);
+      Txletter.type = SEND_ACK;
+      sprintf(Txletter.ft8Message, "SEND_F8_REQ");
+      send(new_socket, &Txletter, sizeof(Txletter), 0);
+      mainFT8(argnumber, argvalue);
+      break;
+    case TEST_SEND:
+      Txletter.type = SEND_ACK;
+      sprintf(Txletter.ft8Message, "TEST_SEND");
+      send(new_socket, &Txletter, sizeof(Txletter), 0);
+      handleSendTx(new_socket);
+      break;
+    default:
+      Txletter.type = REJECTED;
+      sprintf(Txletter.ft8Message, "Wrong Signal");
+      send(new_socket, &Txletter, sizeof(Txletter), 0);
+      break;
     }
-    if (listen(server_fd, 3) < 0)
-    {
-        perror("listen");
-        exit(EXIT_FAILURE);
-    }
-
-    while (true)
-    {
-        /* Clear fd mask */
-        FD_ZERO(&readfds);
-
-        /* Initiate all existing bits */
-        FD_SET(server_fd, &readfds);
-
-        socket_status = select(server_fd + 1, &readfds, (fd_set *)NULL,
-                               (fd_set *)NULL, NULL); // Timeout is null now &timeout);
-        /* Check the return value: less than zero means error
-           zero means timeout
-        */
-
-        switch (socket_status) // Timeout in select, repeat the loop
-        {
-        case -1:
-            printf("Error in Server Socket Status\n");
-            return 0;
-        case 0:
-            // printf("Timeout in Server select\n");
-            break;
-
-        default:
-            //printf("select Server returned a good value\n");
-            break;
-        }
-
-        if (FD_ISSET(server_fd, &readfds))
-        {
-            // printf("FD_ISSET says that it's a new Client socket\n");
-
-            if ((new_socket = accept(server_fd, (struct sockaddr *)&address,
-                                     (socklen_t *)&addrlen)) < 0)
-            {
-                perror("accept");
-                exit(EXIT_FAILURE);
-            }
-        }
-
-        valread = read(new_socket, &Rxletter, sizeof(Rxletter));
-        
-        if (!valread)
-          continue;
-
-        printf("%s\n", Rxletter.ft8Message);
-        switch (Rxletter.type)
-        {
-        case SEND_F8_REQ:
-            string_to_argv(Rxletter.ft8Message,&argnumber,&argvalue);
-            Txletter.type = SEND_ACK;
-            sprintf(Txletter.ft8Message, "SEND_F8_REQ");
-            break;
-        case CHANGE_RTX_STATE:
-            Txletter.type = REJECTED;
-            sprintf(Txletter.ft8Message, "CHANGE_RTX_STATE");
-            break;
-        case TEST_SEND:
-            Txletter.type = SEND_ACK;
-            sprintf(Txletter.ft8Message, "TEST_SEND");
-            handleSendTx(new_socket);
-            break;
-        default:
-            break;
-        }
-        // send(new_socket, &Txletter, sizeof(Txletter), 0);
-        printf("Client request answered\n");
-    }
-    // closing the connected socket
-    close(new_socket);
-    new_socket = 0;
-    // closing the listening socket
-    shutdown(server_fd, SHUT_RDWR);
-    return 0;
+    // send(new_socket, &Txletter, sizeof(Txletter), 0);
+    printf("Client request answered\n");
+  }
+  // closing the connected socket
+  close(new_socket);
+  new_socket = 0;
+  // closing the listening socket
+  shutdown(server_fd, SHUT_RDWR);
+  return 0;
 }
-
-/* ***************************************************************
- *
- * Function: transmitFT8
- *
- * Parameters: FT8Msg_t msg - a msg structure
- *
- * Return value: 0 = OK, otherwise fault
- *
- * Description: This function forwards a message to the target socket
- *
- * *************************************************************** */
-
-int transmitFT8(FT8Msg_t *msg)
-{
-
-    return 0;
-
-} /* routeToSS */
-
-/* ***************************************************************
- *
- * Function: handleBrokenPipe
- *
- * Parameters: int signo = signal number
- *
- * Return value: none
- *
- * Description: This function catches the signal SIGPIPE and closes
- *              the connected socket.
- *
- * *************************************************************** */
 
 void handleBrokenPipe(int signo)
 {
 }
-
-
 
 // Use the mbox interface to allocate a single chunk of memory to hold
 // all the pages we will need. The bus address and the virtual address
@@ -1672,6 +1633,12 @@ int mainFT8(const int argc, char *const argv[])
         std::cout << "  TX started at: ";
         timeval_print(&tvBegin);
         std::cout << std::endl;
+        FT8Msg Txletter;
+
+        Txletter.type = CHANGE_RTX_STATE;
+        Txletter.RTXstate = true;
+        sprintf(Txletter.ft8Message, "Transmitting...\n");
+        send(new_socket, &Txletter, sizeof(Txletter), 0);
 
         struct timeval sym_start;
         struct timeval diff;
@@ -1702,6 +1669,11 @@ int mainFT8(const int argc, char *const argv[])
         timeval_print(&tvEnd);
         timeval_subtract(&tvDiff, &tvEnd, &tvBegin);
         printf(" (%ld.%03ld s)\n", tvDiff.tv_sec, (tvDiff.tv_usec + 500) / 1000);
+
+        Txletter.type = CHANGE_RTX_STATE;
+        Txletter.RTXstate = false;
+        sprintf(Txletter.ft8Message, "End of transmission...\n");
+        send(new_socket, &Txletter, sizeof(Txletter), 0);
       }
       else
       {

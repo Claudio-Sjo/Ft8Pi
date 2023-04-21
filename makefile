@@ -13,7 +13,7 @@ else
 PI_VERSION = -DRPI23
 endif
 
-all: ft8 gpioclk
+all: ft8 gpioclk client
 
 stoargc.o: stoargc.c
 	$(CC) $(CFLAGS) -c stoargc.c
@@ -26,6 +26,9 @@ ft8: mailbox.o ft8.cpp mailbox.h encode.o pack.o text.o constants.o stoargc.o
 
 gpioclk: gpioclk.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) $(PI_VERSION) gpioclk.cpp -ogpioclk
+
+client: client.c
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) $(PI_VERSION) client.c -oclient
 
 clean:
 	$(RM) *.o gpioclk ft8
