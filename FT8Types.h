@@ -13,7 +13,9 @@ typedef enum
 {
 	SEND_F8_REQ 			= 1,
 	CHANGE_RTX_STATE 		= 2,
-	TEST_SEND				= 3
+	TEST_SEND				= 3,
+	SEND_ACK				= 4,
+	REJECTED				= 5
 } SignalType;
 
 
@@ -23,3 +25,8 @@ typedef struct FT8Msg_t
 	char		ft8Message[MAXMSGSIZE];
     bool   RTXstate;
 } FT8Msg;
+
+typedef enum {
+    STR2AV_OK       = 0,
+    STR2AV_UNBALANCED_QUOTE
+} str_to_argv_err_t;

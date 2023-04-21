@@ -267,6 +267,9 @@ int receiveMessage(FT8Msg_t *msg);
 int transmitFT8(FT8Msg_t *msg);
 void handleBrokenPipe(int signo);
 int handleSendTx(int skt);
+str_to_argv_err_t string_to_argv(char const * str, int * argc_p, char *** argv_p);
+int mainFT8(const int argc, char *const argv[]);
+
 
 /* Variables */
 int new_socket = 0;
@@ -300,7 +303,7 @@ int handleSendTx(int skt)
 
 
 
-int Daemon(void)
+int main(const int argc, char *const argv[])
 {
     int server_fd, valread;
     struct sockaddr address = {AF_UNIX, SOCKNAME};
@@ -308,6 +311,8 @@ int Daemon(void)
     socklen_t addrlen = sizeof(address);
     FT8Msg Txletter, Rxletter;
     int socket_status;
+    int argnumber;
+    char **argvalue;
 
     fd_set readfds; /* Flag for select()     */
 
@@ -319,6 +324,16 @@ int Daemon(void)
     sigaddset(&act.sa_mask, SIGPIPE);
     act.sa_flags = 0;
     sigaction(SIGPIPE, &act, (struct sigaction *)NULL);
+
+
+    if (argc > 1)
+      {
+        mainFT8(argc,argv);
+        exit(EXIT_SUCCESS);
+      }
+
+
+    printf("Executing in daemon mode\n");
 
     // Creating socket file descriptor
     if ((server_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
@@ -359,20 +374,20 @@ int Daemon(void)
         switch (socket_status) // Timeout in select, repeat the loop
         {
         case -1:
-            printf("Error in Server Socket Statusn\n");
+            printf("Error in Server Socket Status\n");
             return 0;
         case 0:
             // printf("Timeout in Server select\n");
             break;
 
         default:
-            printf("select Server returned a good value\n");
+            //printf("select Server returned a good value\n");
             break;
         }
 
         if (FD_ISSET(server_fd, &readfds))
         {
-            printf("FD_ISSET says that it's a new Client socket\n");
+            // printf("FD_ISSET says that it's a new Client socket\n");
 
             if ((new_socket = accept(server_fd, (struct sockaddr *)&address,
                                      (socklen_t *)&addrlen)) < 0)
@@ -391,12 +406,16 @@ int Daemon(void)
         switch (Rxletter.type)
         {
         case SEND_F8_REQ:
+            string_to_argv(Rxletter.ft8Message,&argnumber,&argvalue);
+            Txletter.type = SEND_ACK;
             sprintf(Txletter.ft8Message, "SEND_F8_REQ");
             break;
         case CHANGE_RTX_STATE:
+            Txletter.type = REJECTED;
             sprintf(Txletter.ft8Message, "CHANGE_RTX_STATE");
             break;
         case TEST_SEND:
+            Txletter.type = SEND_ACK;
             sprintf(Txletter.ft8Message, "TEST_SEND");
             handleSendTx(new_socket);
             break;
@@ -1462,7 +1481,7 @@ void setup_peri_base_virt(
   close(mem_fd);
 }
 
-int main(const int argc, char *const argv[])
+int mainFT8(const int argc, char *const argv[])
 {
   // catch all signals (like ctrl+c, ctrl+z, ...) to ensure DMA is disabled
   for (int i = 0; i < 64; i++)
