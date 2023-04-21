@@ -302,6 +302,8 @@ int main(const int argc, char *const argv[])
 {
   int server_fd, valread;
   struct sockaddr address = {AF_UNIX, SOCKNAME};
+        char mode[] = "0777";
+
   struct sigaction act;
   socklen_t addrlen = sizeof(address);
   FT8Msg Txletter, Rxletter;
@@ -344,6 +346,9 @@ int main(const int argc, char *const argv[])
     perror("bind failed");
     exit(EXIT_FAILURE);
   }
+
+    chmod (SOCKNAME,strtol(mode, 0, 8));
+
   if (listen(server_fd, 3) < 0)
   {
     perror("listen");
