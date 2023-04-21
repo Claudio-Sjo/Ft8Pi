@@ -25,8 +25,3 @@ typedef struct FT8Msg_t
 	char		ft8Message[MAXMSGSIZE];
     bool   RTXstate;
 } FT8Msg;
-
-typedef enum {
-    STR2AV_OK       = 0,
-    STR2AV_UNBALANCED_QUOTE
-} str_to_argv_err_t;

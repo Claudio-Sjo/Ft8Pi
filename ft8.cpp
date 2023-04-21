@@ -56,6 +56,7 @@
 #include "encode.h"
 
 #include "FT8Types.h"
+#include "stoargc.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -267,7 +268,6 @@ int receiveMessage(FT8Msg_t *msg);
 int transmitFT8(FT8Msg_t *msg);
 void handleBrokenPipe(int signo);
 int handleSendTx(int skt);
-str_to_argv_err_t string_to_argv(char const * str, int * argc_p, char *** argv_p);
 int mainFT8(const int argc, char *const argv[]);
 
 

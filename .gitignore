@@ -4,3 +4,4 @@ constants.o
 encode.o
 pack.o
 text.o
+*.o
